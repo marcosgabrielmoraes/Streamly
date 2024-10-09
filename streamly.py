@@ -1,9 +1,11 @@
-import openai
 import streamlit as st
+import openai
+from openai import OpenAI
 import logging
 import hashlib
-import re
-from openai import OpenAI, OpenAIError
+import pytesseract
+from PIL import Image
+import io
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,20 +27,31 @@ st.set_page_config(
     page_title="CarAI - Intelligent Car Buying Assistant",
     page_icon="🚗",
     layout="wide",
-    initial_sidebar_state="auto",
-    menu_items={
-        "Get help": "https://github.com/YourGitHubUsername/CarAI",
-        "Report a bug": "https://github.com/YourGitHubUsername/CarAI",
-        "About": """
-            ## CarAI - Intelligent Car Buying Assistant
-            ### Powered by GPT-4o
-
-            CarAI is an AI-powered assistant designed to help you analyze vehicle purchases,
-            calculate the best negotiation strategies with banks, and provide clear,
-            objective, and precise business options and potential profits.
-        """
-    }
+    initial_sidebar_state="collapsed",
 )
+
+# CSS for custom styling
+st.markdown("""
+<style>
+.stButton>button {
+    border: 1px solid #ccc;
+    background-color: white;
+    color: #444;
+    padding: 0.25rem 0.75rem;
+    border-radius: 30px;
+    font-size: 14px;
+    margin-right: 10px;
+}
+.stButton>button:hover {
+    border-color: #888;
+    color: #000;
+}
+.chat-container {
+    max-width: 800px;
+    margin: auto;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # User authentication functions
 def hash_password(password):
@@ -66,7 +79,6 @@ def register_user(username, password):
     save_users(users)
     return True
 
-# Login and registration UI
 def login_register_ui():
     st.title("CarAI - Login")
     
@@ -93,12 +105,7 @@ def login_register_ui():
                 st.error("Username already exists. Please choose a different username.")
 
 def initialize_conversation():
-    """
-    Initialize the conversation history with system and assistant messages.
-
-    Returns:
-    - list: Initialized conversation history.
-    """
+    """Initialize the conversation history with system and assistant messages."""
     system_prompt = """
     Você é uma IA especializada em analisar veículos individuais e calcular a melhor forma de negociação com bancos. Seu objetivo é apresentar as opções de negócio e os lucros possíveis para o cliente de forma clara, objetiva e precisa. No final, você deve fornecer os dados de maneira simples e fácil de compreensão para ajudar o cliente a tomar decisões que impactarão sua vida.
 
@@ -140,108 +147,107 @@ def initialize_conversation():
 
     assistant_message = "Olá! Sou o CarAI, seu assistente especializado em análise de veículos e negociações bancárias. Como posso ajudar você hoje?"
 
-    conversation_history = [
+    return [
         {"role": "system", "content": system_prompt},
         {"role": "assistant", "content": assistant_message}
     ]
-    return conversation_history
 
-def format_response(text):
-    # Adicionar quebras de linha após cada ponto final
-    text = re.sub(r'\.(?=\s|$)', '.\n\n', text)
-    
-    # Adicionar marcadores de lista para itens numerados
-    text = re.sub(r'(\d+\.)', r'\n\n- \1', text)
-    
-    # Adicionar negrito para palavras-chave
-    keywords = ["Opção 1:", "Opção 2:", "Opção 3:", "Resumo Final:", "FIPE"]
-    for keyword in keywords:
-        text = text.replace(keyword, f"**{keyword}**")
-    
-    return text
+def process_image(image):
+    """Process the uploaded image using OCR."""
+    try:
+        img = Image.open(io.BytesIO(image.getvalue()))
+        text = pytesseract.image_to_string(img, lang='por')
+        return text
+    except Exception as e:
+        st.error(f"Erro ao processar a imagem: {str(e)}")
+        return None
 
-def on_chat_submit(chat_input):
-    """
-    Handle chat input submissions and interact with the OpenAI API.
-
-    Parameters:
-    - chat_input (str): The chat input from the user.
-
-    Returns:
-    - None: Updates the chat history in Streamlit's session state.
-    """
-    user_input = chat_input.strip()
-
+def on_chat_submit(chat_input, uploaded_file=None):
+    """Handle chat input submissions and interact with the OpenAI API."""
     if 'conversation_history' not in st.session_state:
         st.session_state.conversation_history = initialize_conversation()
+
+    user_input = chat_input.strip()
+    
+    if uploaded_file:
+        file_content = process_image(uploaded_file) if uploaded_file.type.startswith('image') else uploaded_file.getvalue().decode()
+        user_input += f"\n\nConteúdo do arquivo enviado:\n{file_content}"
 
     st.session_state.conversation_history.append({"role": "user", "content": user_input})
 
     try:
-        model_engine = "gpt-4o"
         response = client.chat.completions.create(
-            model=model_engine,
+            model="gpt-4",
             messages=st.session_state.conversation_history
         )
         assistant_reply = response.choices[0].message.content
-        formatted_reply = format_response(assistant_reply)
 
-        st.session_state.conversation_history.append({"role": "assistant", "content": formatted_reply})
+        st.session_state.conversation_history.append({"role": "assistant", "content": assistant_reply})
         st.session_state.history.append({"role": "user", "content": user_input})
-        st.session_state.history.append({"role": "assistant", "content": formatted_reply})
+        st.session_state.history.append({"role": "assistant", "content": assistant_reply})
 
-    except OpenAIError as e:
-        logging.error(f"Error occurred: {e}")
-        st.error(f"OpenAI Error: {str(e)}")
-
-def initialize_session_state():
-    """Initialize session state variables."""
-    if "history" not in st.session_state:
-        st.session_state.history = []
-    if 'conversation_history' not in st.session_state:
-        st.session_state.conversation_history = []
-    if 'logged_in' not in st.session_state:
-        st.session_state.logged_in = False
+    except Exception as e:
+        logging.error(f"Erro ocorrido: {e}")
+        st.error(f"Erro ao processar sua solicitação: {str(e)}")
 
 def main():
-    """
-    Main function to run the Streamlit app.
-    """
-    initialize_session_state()
+    """Main function to run the Streamlit app."""
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
 
     if not st.session_state.logged_in:
         login_register_ui()
     else:
-        if not st.session_state.history:
-            initial_bot_message = f"Olá {st.session_state.username}! Sou o CarAI, seu assistente especializado em análise de veículos e negociações bancárias. Como posso ajudar você hoje?"
-            st.session_state.history.append({"role": "assistant", "content": initial_bot_message})
+        if 'history' not in st.session_state:
+            st.session_state.history = []
+        if 'conversation_history' not in st.session_state:
             st.session_state.conversation_history = initialize_conversation()
 
-        # Sidebar
-        st.sidebar.title(f"Bem-vindo, {st.session_state.username}!")
-        st.sidebar.markdown("""
-        ### Como usar o CarAI
-        - **Forneça informações do veículo**: Informe detalhes sobre o carro, parcelas e banco.
-        - **Peça análises**: Solicite cálculos de quitação, estratégias de negócio e lucros esperados.
-        - **Obtenha resumos**: Peça um resumo final com as melhores opções de negócio.
-        """)
+        st.title("CarAI - Seu Assistente Inteligente para Compra de Carros")
 
+        # Chat container
+        chat_container = st.container()
+        
+        with chat_container:
+            for message in st.session_state.history[-NUMBER_OF_MESSAGES_TO_DISPLAY:]:
+                with st.chat_message(message["role"]):
+                    st.write(message["content"])
+
+        # Input area
+        with st.container():
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                chat_input = st.text_input("Digite sua mensagem:", key="chat_input")
+            with col2:
+                uploaded_file = st.file_uploader("", type=["txt", "pdf", "png", "jpg", "jpeg"])
+
+            # Botões de funcionalidades
+            col1, col2, col3, col4, col5 = st.columns(5)
+            with col1:
+                if st.button("Criar imagem"):
+                    st.write("Funcionalidade de criar imagem não implementada.")
+            with col2:
+                if st.button("Analisar dados"):
+                    st.write("Funcionalidade de analisar dados não implementada.")
+            with col3:
+                if st.button("Conselhos"):
+                    st.write("Funcionalidade de conselhos não implementada.")
+            with col4:
+                if st.button("Ajude a escrever"):
+                    st.write("Funcionalidade de ajuda na escrita não implementada.")
+            with col5:
+                if st.button("Mais"):
+                    st.write("Mais opções não implementadas.")
+
+            if st.button("Enviar"):
+                if chat_input or uploaded_file:
+                    on_chat_submit(chat_input, uploaded_file)
+                    st.rerun()
+
+        # Logout button
         if st.sidebar.button("Logout"):
             st.session_state.logged_in = False
             st.rerun()
-
-        # Main chat interface
-        st.title("CarAI - Seu Assistente Inteligente para Compra de Carros")
-        
-        chat_input = st.chat_input("Pergunte sobre análise de veículos ou estratégias de negociação:")
-        if chat_input:
-            on_chat_submit(chat_input)
-
-        # Display chat history
-        for message in st.session_state.history[-NUMBER_OF_MESSAGES_TO_DISPLAY:]:
-            role = message["role"]
-            with st.chat_message(role):
-                st.markdown(message["content"])
 
 if __name__ == "__main__":
     main()
