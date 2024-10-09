@@ -216,34 +216,16 @@ def main():
 
         # Input area
         with st.container():
-            col1, col2 = st.columns([4, 1])
+            col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
                 chat_input = st.text_input("Digite sua mensagem:", key="chat_input")
             with col2:
-                uploaded_file = st.file_uploader("", type=["txt", "pdf", "png", "jpg", "jpeg"])
-
-            # Botões de funcionalidades
-            col1, col2, col3, col4, col5 = st.columns(5)
-            with col1:
-                if st.button("Criar imagem"):
-                    st.write("Funcionalidade de criar imagem não implementada.")
-            with col2:
-                if st.button("Analisar dados"):
-                    st.write("Funcionalidade de analisar dados não implementada.")
+                uploaded_file = st.file_uploader("Enviar arquivo", type=["txt", "pdf", "png", "jpg", "jpeg"])
             with col3:
-                if st.button("Conselhos"):
-                    st.write("Funcionalidade de conselhos não implementada.")
-            with col4:
-                if st.button("Ajude a escrever"):
-                    st.write("Funcionalidade de ajuda na escrita não implementada.")
-            with col5:
-                if st.button("Mais"):
-                    st.write("Mais opções não implementadas.")
-
-            if st.button("Enviar"):
-                if chat_input or uploaded_file:
-                    on_chat_submit(chat_input, uploaded_file)
-                    st.rerun()
+                if st.button("Enviar"):
+                    if chat_input or uploaded_file:
+                        on_chat_submit(chat_input, uploaded_file)
+                        st.rerun()
 
         # Logout button
         if st.sidebar.button("Logout"):
