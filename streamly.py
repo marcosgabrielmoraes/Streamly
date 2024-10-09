@@ -1,13 +1,8 @@
 import openai
 import streamlit as st
 import logging
-from PIL import Image, ImageEnhance
-import time
-import json
-import requests
-import base64
-from openai import OpenAI, OpenAIError
 import hashlib
+from openai import OpenAI, OpenAIError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,8 +17,7 @@ if not OPENAI_API_KEY:
     st.stop()
 
 # Assign OpenAI API Key
-openai.api_key = OPENAI_API_KEY
-client = openai.OpenAI()
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Streamlit Page Configuration
 st.set_page_config(
@@ -37,8 +31,6 @@ st.set_page_config(
         "About": """
             ## CarAI - Intelligent Car Buying Assistant
             ### Powered by GPT-4
-
-            **GitHub**: https://github.com/YourGitHubUsername/
 
             CarAI is an AI-powered assistant designed to help you analyze vehicle purchases,
             calculate the best negotiation strategies with banks, and provide clear,
@@ -98,15 +90,6 @@ def login_register_ui():
                 st.success("Registration successful. You can now log in.")
             else:
                 st.error("Username already exists. Please choose a different username.")
-
-def img_to_base64(image_path):
-    """Convert image to base64."""
-    try:
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
-    except Exception as e:
-        logging.error(f"Error converting image to base64: {str(e)}")
-        return None
 
 def initialize_conversation():
     """
@@ -218,46 +201,9 @@ def main():
             st.session_state.history.append({"role": "assistant", "content": initial_bot_message})
             st.session_state.conversation_history = initialize_conversation()
 
-        # Insert custom CSS for glowing effect
-        st.markdown(
-            """
-            <style>
-            .cover-glow {
-                width: 100%;
-                height: auto;
-                padding: 3px;
-                box-shadow: 
-                    0 0 5px #000033,
-                    0 0 10px #000066,
-                    0 0 15px #000099,
-                    0 0 20px #0000CC,
-                    0 0 25px #0000FF,
-                    0 0 30px #3333FF,
-                    0 0 35px #6666FF;
-                position: relative;
-                z-index: -1;
-                border-radius: 45px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Load and display sidebar image
-        img_path = "imgs/car_ai_avatar.png"  # Replace with your car AI image
-        img_base64 = img_to_base64(img_path)
-        if img_base64:
-            st.sidebar.markdown(
-                f'<img src="data:image/png;base64,{img_base64}" class="cover-glow">',
-                unsafe_allow_html=True,
-            )
-
-        st.sidebar.markdown("---")
-
-        # Sidebar for information
-        st.sidebar.markdown(f"""
-        ### Bem-vindo, {st.session_state.username}!
-        
+        # Sidebar
+        st.sidebar.title(f"Bem-vindo, {st.session_state.username}!")
+        st.sidebar.markdown("""
         ### Como usar o CarAI
         - **Forneça informações do veículo**: Informe detalhes sobre o carro, parcelas e banco.
         - **Peça análises**: Solicite cálculos de quitação, estratégias de negócio e lucros esperados.
@@ -267,17 +213,6 @@ def main():
         if st.sidebar.button("Logout"):
             st.session_state.logged_in = False
             st.rerun()
-
-        st.sidebar.markdown("---")
-
-        # Load and display image with glowing effect
-        img_path = "imgs/car_ai_banner.png"  # Replace with your car AI banner image
-        img_base64 = img_to_base64(img_path)
-        if img_base64:
-            st.sidebar.markdown(
-                f'<img src="data:image/png;base64,{img_base64}" class="cover-glow">',
-                unsafe_allow_html=True,
-            )
 
         # Main chat interface
         st.title("CarAI - Seu Assistente Inteligente para Compra de Carros")
@@ -289,8 +224,7 @@ def main():
         # Display chat history
         for message in st.session_state.history[-NUMBER_OF_MESSAGES_TO_DISPLAY:]:
             role = message["role"]
-            avatar_image = "imgs/car_ai_avatar.png" if role == "assistant" else "imgs/user_avatar.png"
-            with st.chat_message(role, avatar=avatar_image):
+            with st.chat_message(role):
                 st.write(message["content"])
 
 if __name__ == "__main__":
