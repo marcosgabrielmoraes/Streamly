@@ -3,9 +3,8 @@ import openai
 from openai import OpenAI
 import logging
 import hashlib
-import pytesseract
-from PIL import Image
 import io
+import base64
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -152,14 +151,16 @@ def initialize_conversation():
         {"role": "assistant", "content": assistant_message}
     ]
 
-def process_image(image):
-    """Process the uploaded image using OCR."""
+def process_file(file):
+    """Process the uploaded file."""
     try:
-        img = Image.open(io.BytesIO(image.getvalue()))
-        text = pytesseract.image_to_string(img, lang='por')
-        return text
+        content = file.getvalue()
+        if file.type.startswith('image'):
+            return f"[Imagem carregada: {file.name}]"
+        else:
+            return content.decode('utf-8')
     except Exception as e:
-        st.error(f"Erro ao processar a imagem: {str(e)}")
+        st.error(f"Erro ao processar o arquivo: {str(e)}")
         return None
 
 def on_chat_submit(chat_input, uploaded_file=None):
@@ -170,14 +171,14 @@ def on_chat_submit(chat_input, uploaded_file=None):
     user_input = chat_input.strip()
     
     if uploaded_file:
-        file_content = process_image(uploaded_file) if uploaded_file.type.startswith('image') else uploaded_file.getvalue().decode()
+        file_content = process_file(uploaded_file)
         user_input += f"\n\nConteúdo do arquivo enviado:\n{file_content}"
 
     st.session_state.conversation_history.append({"role": "user", "content": user_input})
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=st.session_state.conversation_history
         )
         assistant_reply = response.choices[0].message.content
