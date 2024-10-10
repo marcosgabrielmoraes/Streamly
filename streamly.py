@@ -2,7 +2,6 @@ import openai
 import streamlit as st
 import logging
 import hashlib
-import re
 from openai import OpenAI, OpenAIError
 
 # Configure logging
@@ -31,7 +30,7 @@ st.set_page_config(
         "Report a bug": "https://github.com/YourGitHubUsername/CarAI",
         "About": """
             ## CarAI - Intelligent Car Buying Assistant
-            ### Powered by GPT-4o
+            ### Powered by GPT-4
 
             CarAI is an AI-powered assistant designed to help you analyze vehicle purchases,
             calculate the best negotiation strategies with banks, and provide clear,
@@ -146,20 +145,6 @@ def initialize_conversation():
     ]
     return conversation_history
 
-def format_response(text):
-    # Adicionar quebras de linha após cada ponto final
-    text = re.sub(r'\.(?=\s|$)', '.\n\n', text)
-    
-    # Adicionar marcadores de lista para itens numerados
-    text = re.sub(r'(\d+\.)', r'\n\n- \1', text)
-    
-    # Adicionar negrito para palavras-chave
-    keywords = ["Opção 1:", "Opção 2:", "Opção 3:", "Resumo Final:", "FIPE"]
-    for keyword in keywords:
-        text = text.replace(keyword, f"**{keyword}**")
-    
-    return text
-
 def on_chat_submit(chat_input):
     """
     Handle chat input submissions and interact with the OpenAI API.
@@ -178,17 +163,16 @@ def on_chat_submit(chat_input):
     st.session_state.conversation_history.append({"role": "user", "content": user_input})
 
     try:
-        model_engine = "gpt-4o"
+        model_engine = "gpt-4"
         response = client.chat.completions.create(
             model=model_engine,
             messages=st.session_state.conversation_history
         )
         assistant_reply = response.choices[0].message.content
-        formatted_reply = format_response(assistant_reply)
 
-        st.session_state.conversation_history.append({"role": "assistant", "content": formatted_reply})
+        st.session_state.conversation_history.append({"role": "assistant", "content": assistant_reply})
         st.session_state.history.append({"role": "user", "content": user_input})
-        st.session_state.history.append({"role": "assistant", "content": formatted_reply})
+        st.session_state.history.append({"role": "assistant", "content": assistant_reply})
 
     except OpenAIError as e:
         logging.error(f"Error occurred: {e}")
@@ -241,7 +225,7 @@ def main():
         for message in st.session_state.history[-NUMBER_OF_MESSAGES_TO_DISPLAY:]:
             role = message["role"]
             with st.chat_message(role):
-                st.markdown(message["content"])
+                st.write(message["content"])
 
 if __name__ == "__main__":
     main()
